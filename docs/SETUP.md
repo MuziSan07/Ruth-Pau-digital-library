@@ -226,12 +226,45 @@ You will end with four values for `admin/.env.local`:
 
    **Update** → **Save and continue**.
 6. **Test users** → **Add users** → add your own Google address → **Save and continue**.
-7. Back on the OAuth consent screen, click **Publish app** → confirm.
+7. **Publish the app** — see step 2.2b below. Do this *before* generating the
+   refresh token.
 
-   > ⚠️ **Do not skip publishing.** While the app is in *Testing*, Google expires
-   > refresh tokens after **7 days**, and uploads break with `invalid_grant`
-   > a week after everything looked fine. Publishing makes them permanent.
-   > No Google review is needed — that only applies to sensitive scopes.
+---
+
+### Step 2.2b — Publish the consent screen
+
+> ⚠️ **Do not skip this.** While the app sits in *Testing*, Google expires
+> refresh tokens after **7 days**. Uploads then break with `invalid_grant`
+> a week after setup looked perfectly fine — a genuinely confusing failure to
+> debug. Publishing makes refresh tokens permanent.
+
+The console moved this page out of *APIs & Services* into **Google Auth
+Platform**. Go straight to:
+
+**https://console.cloud.google.com/auth/audience**
+
+(Check the project picker says **digital-library-ruth-puaf**.)
+
+1. Find **Publishing status** — it reads `Testing`
+2. Click **PUBLISH APP**
+3. Confirm the *"available to any user with a Google Account"* dialog
+4. Status now reads **In production** ✅
+
+*Older console layout:* **APIs & Services → OAuth consent screen → Publish app**.
+
+**If it warns about verification, ignore it.** Verification is only enforced
+for *sensitive* and *restricted* scopes such as full `drive`. The `drive.file`
+scope is **non-sensitive** — it only reaches files the app itself created — so
+the app publishes instantly with no review.
+
+The one visible side effect: during step 2.4 you will hit a
+**"Google hasn't verified this app"** interstitial. Click
+**Advanced → Go to Digital Library (unsafe)**. It refers to your own app, which
+only you will ever authorise.
+
+> **Order matters.** A refresh token minted while the app was still in Testing
+> keeps its 7-day expiry — publishing later does not extend it. If you already
+> generated one, redo step 2.4 to mint a fresh one.
 
 ---
 

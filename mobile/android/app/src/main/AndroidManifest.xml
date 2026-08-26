@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Flutter only adds INTERNET to the debug and profile manifests, so a
+         release APK without this line signs in and downloads nothing. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="digitallibrary"
+        android:label="Digital Library"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -142,7 +142,14 @@ export async function deleteDriveFile(fileId) {
   }
 }
 
-/** Direct-download URL used by the mobile app. */
+/**
+ * Direct-download URL used by the mobile app.
+ *
+ * Uses drive.usercontent.google.com with confirm=t rather than the older
+ * drive.google.com/uc form: past roughly 100 MB the old endpoint serves an
+ * HTML "can't scan this file for viruses" interstitial instead of the bytes,
+ * and the app would silently save that page as the book.
+ */
 export function downloadUrl(fileId) {
-  return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
 }
