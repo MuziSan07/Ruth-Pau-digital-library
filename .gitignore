@@ -1,0 +1,36 @@
+# ---- Secrets: never commit ----
+**/.secrets/
+*firebase-adminsdk*.json
+*service-account*.json
+.env
+.env.*
+!.env.example
+
+# ---- Node / React admin ----
+node_modules/
+dist/
+.vercel/
+npm-debug.log*
+*.log
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/**/*.jks
+mobile/**/*.keystore
+mobile/ios/Pods/
+
+# Firebase app config for mobile (safe, but keep out of the repo)
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist
+
+# ---- OS / editors ----
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/

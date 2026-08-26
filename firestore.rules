@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Digital Library — Firestore security rules
+//
+// Principle: the mobile app and admin panel only ever READ through these rules.
+// Every write goes through the Vercel serverless API using the Firebase Admin
+// SDK, which bypasses rules entirely. That keeps a compromised client from
+// creating students, editing books, or promoting itself to admin.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Set as a custom claim by the API when an account is created.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    function isActive() {
+      return isSignedIn() && request.auth.token.disabled != true;
+    }
+
+    // --- users ---------------------------------------------------------
+    // A student may read only their own profile. Admins may read all.
+    // Nobody writes from the client.
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if false;
+    }
+
+    // --- books ---------------------------------------------------------
+    // Any signed-in, non-disabled account may browse the catalogue.
+    // Uploads and deletions are server-only.
+    match /books/{bookId} {
+      allow read: if isActive();
+      allow write: if false;
+    }
+
+    // --- everything else -------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
