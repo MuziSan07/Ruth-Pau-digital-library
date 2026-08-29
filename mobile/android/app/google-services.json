@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "695018948722",
+    "project_id": "digital-library-ruth-puaf",
+    "storage_bucket": "digital-library-ruth-puaf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:695018948722:android:0c629f51225d68b4451aeb",
+        "android_client_info": {
+          "package_name": "com.ruthpuaf.digitallibrary"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDr2PSSK8EULOU7B3rioZOWz-3PwO9CU4c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
