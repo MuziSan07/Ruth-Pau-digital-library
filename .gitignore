@@ -25,8 +25,11 @@ mobile/**/*.jks
 mobile/**/*.keystore
 mobile/ios/Pods/
 
-# Firebase app config for mobile (safe, but keep out of the repo)
-mobile/android/app/google-services.json
+# Firebase mobile config is deliberately COMMITTED, not ignored: the
+# google-services Gradle plugin fails the build without it, so a fresh clone
+# could not produce an APK. It holds no secrets — the same identifiers are in
+# mobile/lib/firebase_options.dart and ship inside every APK. Access is
+# controlled by Firestore rules, not by hiding these values.
 mobile/ios/Runner/GoogleService-Info.plist
 
 # ---- OS / editors ----

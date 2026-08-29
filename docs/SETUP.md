@@ -294,7 +294,17 @@ only you will ever authorise.
 
 1. Open **https://developers.google.com/oauthplayground**
 2. Click the **⚙ gear** (top right) → tick **Use your own OAuth credentials**
-   → paste your Client ID and Client secret → close the panel.
+   → paste your Client ID and Client secret.
+
+   While the panel is open, also confirm:
+   - **Access type: Offline** — this is what makes Google return a refresh
+     token at all. With *Online* you get only a 1-hour access token and step 6
+     will show no refresh token to copy.
+   - **Force prompt consent** ticked — Google issues a refresh token only on
+     the *first* consent for a given client. Without this, re-running the flow
+     after an earlier attempt silently returns nothing.
+
+   Then close the panel.
 3. In the left list, scroll to **Drive API v3** and tick **only**:
 
    ```
