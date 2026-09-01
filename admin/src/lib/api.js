@@ -124,8 +124,19 @@ function putToDrive({ uploadUrl, file, onProgress }) {
       }
     };
 
+    // A blocked cross-origin request and a dropped connection are
+    // indistinguishable here: the browser reports both as an error with no
+    // status and no body. Say so, rather than blaming the network and sending
+    // someone to check a connection that is fine.
     xhr.onerror = () =>
-      reject(new Error('The upload failed. Check your network connection.'));
+      reject(
+        new Error(
+          'The upload could not reach Google Drive. This is usually a ' +
+            'connection problem, but it can also mean the upload session was ' +
+            'rejected. Try again, and if it keeps failing check the Vercel ' +
+            'function logs for /api/books/upload-session.',
+        ),
+      );
     xhr.onabort = () => reject(new Error('The upload was cancelled.'));
 
     xhr.send(file);

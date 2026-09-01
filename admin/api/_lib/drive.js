@@ -73,6 +73,7 @@ export async function createResumableUploadSession({
   fileName,
   mimeType,
   fileSize,
+  origin,
 }) {
   const folderId = requiredEnv('GOOGLE_DRIVE_FOLDER_ID');
   const token = await accessToken();
@@ -84,6 +85,12 @@ export async function createResumableUploadSession({
       'Content-Type': 'application/json; charset=UTF-8',
       'X-Upload-Content-Type': mimeType,
       ...(fileSize ? { 'X-Upload-Content-Length': String(fileSize) } : {}),
+      // Required when the session is opened here but the bytes are sent from a
+      // browser. Google binds the session to this origin and only then returns
+      // CORS headers for it on the upload request. Without this the browser
+      // blocks the PUT, which surfaces as a bare network error with no status,
+      // indistinguishable from the connection actually being down.
+      ...(origin ? { Origin: origin } : {}),
     },
     body: JSON.stringify({ name: fileName, parents: [folderId], mimeType }),
   });
