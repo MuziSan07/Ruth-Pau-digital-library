@@ -51,10 +51,17 @@ async function handler(req, res) {
     );
   }
 
+  // The browser sends the bytes, so Google must bind the session to the
+  // browser's origin rather than to this function.
+  const origin =
+    req.headers?.origin ||
+    (req.headers?.host ? `https://${req.headers.host}` : null);
+
   const uploadUrl = await createResumableUploadSession({
     fileName: cleanName,
     mimeType,
     fileSize: size,
+    origin,
   });
 
   ok(res, { uploadUrl });
