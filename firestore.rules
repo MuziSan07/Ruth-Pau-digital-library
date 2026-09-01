@@ -19,8 +19,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.role == 'admin';
     }
 
+    // A suspended account is stopped at Firebase Auth: it cannot sign in, and
+    // its refresh tokens are revoked when it is disabled. There is no
+    // "disabled" custom claim, so this must not read one directly — accessing
+    // a key the token does not carry makes the whole expression fail, and the
+    // rule then denies every read. get() with a default keeps it safe if such
+    // a claim is ever introduced.
     function isActive() {
-      return isSignedIn() && request.auth.token.disabled != true;
+      return isSignedIn() && request.auth.token.get('disabled', false) != true;
     }
 
     // --- users ---------------------------------------------------------
