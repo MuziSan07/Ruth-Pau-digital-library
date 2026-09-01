@@ -40,14 +40,24 @@ async function request(path, { method = 'GET', body } = {}) {
   return payload;
 }
 
+/** Builds a query string from defined values only. */
+function qs({ q, cursor, limit } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (cursor) params.set('cursor', cursor);
+  if (limit) params.set('limit', String(limit));
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
 export const api = {
-  listStudents: () => request('/students'),
+  listStudents: (opts) => request(`/students${qs(opts)}`),
   createStudent: (data) => request('/students', { method: 'POST', body: data }),
   updateStudent: (uid, data) =>
     request(`/students/${uid}`, { method: 'PATCH', body: data }),
   deleteStudent: (uid) => request(`/students/${uid}`, { method: 'DELETE' }),
 
-  listBooks: () => request('/books'),
+  listBooks: (opts) => request(`/books${qs(opts)}`),
   updateBook: (id, data) => request(`/books/${id}`, { method: 'PATCH', body: data }),
   deleteBook: (id) => request(`/books/${id}`, { method: 'DELETE' }),
 };

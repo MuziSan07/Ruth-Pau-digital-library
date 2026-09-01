@@ -11,6 +11,7 @@ import {
   withErrorHandling,
 } from '../_lib/http.js';
 import { deleteDriveFile } from '../_lib/drive.js';
+import { normalise } from '../_lib/search.js';
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_EXTRACT_LENGTH = 5000;
@@ -39,6 +40,8 @@ async function patchBook(req, res, id) {
       return fail(res, 400, `The title must be under ${MAX_TITLE_LENGTH} characters.`);
     }
     updates.title = cleanTitle;
+    // Must move with the title or the book becomes unfindable by search.
+    updates.titleLower = normalise(cleanTitle);
   }
 
   if (extract !== undefined) {

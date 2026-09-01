@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/book.dart';
@@ -20,10 +22,118 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final _fileService = BookFileService();
   final _searchController = TextEditingController();
 
+  /// Live first page. Bounded, so its cost does not grow with the catalogue.
+  StreamSubscription<List<Book>>? _subscription;
+  List<Book> _livePage = const [];
+
+  /// Pages fetched on demand after the live one.
+  final List<Book> _extraPages = [];
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
   String _query = '';
+  Timer? _debounce;
+  bool _searching = false;
+  List<Book>? _results; // null means "not searching"
+
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribe();
+  }
+
+  void _subscribe() {
+    _subscription?.cancel();
+    _subscription = _libraryService.watchFirstPage().listen(
+      (books) {
+        if (!mounted) return;
+        setState(() {
+          // A new book at the top shifts every later page by one, so already
+          // loaded pages would overlap. Dropping them is simpler than trying
+          // to reconcile, and only happens when the catalogue actually changes.
+          final headChanged =
+              _livePage.isEmpty || books.isEmpty || books.first.id != _livePage.first.id;
+          if (headChanged) _extraPages.clear();
+
+          _livePage = books;
+          _hasMore = books.length >= LibraryService.pageSize;
+          _loading = false;
+          _error = null;
+        });
+      },
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _error = error;
+          _loading = false;
+        });
+      },
+    );
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    final combined = [..._livePage, ..._extraPages];
+    if (combined.isEmpty) return;
+
+    setState(() => _loadingMore = true);
+    try {
+      final page = await _libraryService.loadMore(combined.last.id);
+      if (!mounted) return;
+      setState(() {
+        _extraPages.addAll(page.books);
+        _hasMore = page.hasMore;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() => _query = value);
+    _debounce?.cancel();
+
+    if (value.trim().isEmpty) {
+      setState(() {
+        _results = null;
+        _searching = false;
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 350), _runSearch);
+  }
+
+  Future<void> _runSearch() async {
+    final term = _query.trim();
+    if (term.isEmpty) return;
+
+    setState(() => _searching = true);
+    try {
+      final page = await _libraryService.search(term);
+      if (!mounted) return;
+      setState(() {
+        _results = page.books;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _subscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -55,17 +165,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
-  List<Book> _filter(List<Book> books) {
-    final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return books;
-
-    return books
-        .where((book) =>
-            book.title.toLowerCase().contains(query) ||
-            book.extract.toLowerCase().contains(query))
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -82,97 +181,136 @@ class _LibraryScreenState extends State<LibraryScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: StreamBuilder<List<Book>>(
-        stream: _libraryService.watchBooks(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _ErrorState(
-              message: 'Could not load the library.\n'
-                  'Check your connection and pull down to retry.',
-              onRetry: () => setState(() {}),
-            );
-          }
+      body: _buildBody(theme),
+    );
+  }
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+  Widget _buildBody(ThemeData theme) {
+    if (_error != null && _livePage.isEmpty && _results == null) {
+      return _ErrorState(
+        message: 'Could not load the library.\n'
+            'Check your connection and try again.',
+        onRetry: _subscribe,
+      );
+    }
 
-          final books = snapshot.data ?? const <Book>[];
-          final visible = _filter(books);
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-          return Column(
-            children: [
-              if (books.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _query = value),
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: 'Search books…',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.close),
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                            ),
+    final searching = _results != null;
+    final visible = searching ? _results! : [..._livePage, ..._extraPages];
+    final catalogueEmpty = _livePage.isEmpty && !searching;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: TextField(
+            controller: _searchController,
+            onChanged: _onQueryChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search by title…',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _searchController.clear();
+                        _onQueryChanged('');
+                      },
                     ),
-                  ),
-                ),
-              Expanded(
-                child: books.isEmpty
-                    ? const _EmptyState(
-                        icon: Icons.menu_book_outlined,
-                        title: 'No books yet',
-                        message:
-                            'Books added by your administrator will appear here.',
-                      )
-                    : visible.isEmpty
-                        ? const _EmptyState(
-                            icon: Icons.search_off_outlined,
-                            title: 'No matches',
-                            message: 'Try a different search term.',
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                            itemCount: visible.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) => _BookCard(
-                              book: visible[index],
-                              fileService: _fileService,
-                              onOpen: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BookDetailScreen(
-                                    book: visible[index],
-                                    fileService: _fileService,
-                                  ),
-                                ),
+            ),
+          ),
+        ),
+        if (_searching)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            child: SizedBox(
+              height: 2,
+              child: LinearProgressIndicator(),
+            ),
+          ),
+        Expanded(
+          child: catalogueEmpty
+              ? const _EmptyState(
+                  icon: Icons.menu_book_outlined,
+                  title: 'No books yet',
+                  message: 'Books added by your administrator will appear here.',
+                )
+              : visible.isEmpty
+                  ? const _EmptyState(
+                      icon: Icons.search_off_outlined,
+                      title: 'No matches',
+                      // Search matches the start of a title, so say so rather
+                      // than letting the student assume the book is missing.
+                      message: 'Search matches the beginning of a title. '
+                          'Try the first word.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                      // One extra row for the load more control.
+                      itemCount: visible.length + (_showLoadMore(searching) ? 1 : 0),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        if (index >= visible.length) {
+                          return _LoadMoreButton(
+                            loading: _loadingMore,
+                            onPressed: _loadMore,
+                          );
+                        }
+                        final book = visible[index];
+                        return _BookCard(
+                          book: book,
+                          fileService: _fileService,
+                          onOpen: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookDetailScreen(
+                                book: book,
+                                fileService: _fileService,
                               ),
                             ),
                           ),
-              ),
-              if (books.isNotEmpty && visible.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Text(
-                    '${visible.length} of ${books.length} '
-                    '${books.length == 1 ? 'book' : 'books'}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                        );
+                      },
                     ),
-                  ),
-                ),
-            ],
-          );
-        },
+        ),
+        if (visible.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              searching
+                  ? '${visible.length} ${visible.length == 1 ? 'match' : 'matches'}'
+                  : 'Showing ${visible.length}${_hasMore ? ' of more' : ''}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  bool _showLoadMore(bool searching) => !searching && _hasMore;
+}
+
+class _LoadMoreButton extends StatelessWidget {
+  const _LoadMoreButton({required this.loading, required this.onPressed});
+
+  final bool loading;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: OutlinedButton(
+        onPressed: loading ? null : onPressed,
+        child: Text(loading ? 'Loading…' : 'Load more books'),
       ),
     );
   }
