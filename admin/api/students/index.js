@@ -16,20 +16,78 @@ import {
   withErrorHandling,
 } from '../_lib/http.js';
 import { resolveLoginId } from '../_lib/ids.js';
+import {
+  applyCursor,
+  fetchPage,
+  normalise,
+  readPaging,
+} from '../_lib/search.js';
 
 const MIN_PASSWORD_LENGTH = 6;
 
+const toStudent = (doc) => ({ uid: doc.id, ...doc.data() });
+
+/**
+ * Searching by name and by roll number are two different range scans, so both
+ * run and the results are merged. A roll number match is listed first because
+ * an admin typing one is looking for that exact student.
+ */
+async function searchStudents(collection, term, limit) {
+  const prefix = normalise(term);
+  const high = prefix + '';
+
+  const [byLogin, byName] = await Promise.all([
+    collection
+      .where('role', '==', 'student')
+      .orderBy('loginIdLower')
+      .startAt(prefix)
+      .endAt(high)
+      .limit(limit)
+      .get(),
+    collection
+      .where('role', '==', 'student')
+      .orderBy('nameLower')
+      .startAt(prefix)
+      .endAt(high)
+      .limit(limit)
+      .get(),
+  ]);
+
+  const seen = new Set();
+  const merged = [];
+  for (const doc of [...byLogin.docs, ...byName.docs]) {
+    if (seen.has(doc.id)) continue;
+    seen.add(doc.id);
+    merged.push(toStudent(doc));
+  }
+
+  return merged.slice(0, limit);
+}
+
 async function listStudents(req, res) {
-  const snapshot = await db()
-    .collection('users')
+  const { limit, cursor, q } = readPaging(req);
+  const collection = db().collection('users');
+
+  if (q) {
+    // Search returns a single merged page; paging through two interleaved
+    // range scans would give an unstable order.
+    const students = await searchStudents(collection, q, limit);
+    return ok(res, { students, nextCursor: null, hasMore: false, query: q });
+  }
+
+  const base = collection
     .where('role', '==', 'student')
-    .get();
+    .orderBy('createdAt', 'desc');
 
-  const students = snapshot.docs
-    .map((doc) => ({ uid: doc.id, ...doc.data() }))
-    .sort((a, b) => (b.createdAt?._seconds || 0) - (a.createdAt?._seconds || 0));
+  const query = await applyCursor(base, collection, cursor);
+  const page = await fetchPage(query, limit, toStudent);
 
-  ok(res, { students });
+  ok(res, {
+    students: page.items,
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+    query: null,
+  });
 }
 
 async function createStudent(req, res, adminUser) {
@@ -91,7 +149,10 @@ async function createStudent(req, res, adminUser) {
   const profile = {
     role: 'student',
     name: displayName,
+    // Search keys, kept in step with their source fields on every write.
+    nameLower: normalise(displayName),
     loginId: cleanLoginId,
+    loginIdLower: normalise(cleanLoginId),
     loginKind: kind,
     authEmail,
     disabled: false,

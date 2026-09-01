@@ -10,6 +10,7 @@ import {
   readJson,
   withErrorHandling,
 } from '../_lib/http.js';
+import { normalise } from '../_lib/search.js';
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -63,7 +64,10 @@ async function patchStudent(req, res, uid) {
     const displayName = String(name).trim();
     if (!displayName) return fail(res, 400, 'The name cannot be empty.');
     await auth().updateUser(uid, { displayName });
-    await student.ref.update({ name: displayName });
+    await student.ref.update({
+      name: displayName,
+      nameLower: normalise(displayName),
+    });
     changes.push('name');
   }
 

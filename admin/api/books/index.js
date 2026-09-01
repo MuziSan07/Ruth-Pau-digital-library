@@ -1,4 +1,4 @@
-// GET  /api/books  — list the catalogue
+// GET  /api/books  — list the catalogue, paged, optionally filtered
 // POST /api/books  — record a finished Drive upload as a book
 //
 // POST is step 2 of the upload flow: the browser has already streamed the file
@@ -15,6 +15,13 @@ import {
   withErrorHandling,
 } from '../_lib/http.js';
 import {
+  applyCursor,
+  applyPrefix,
+  fetchPage,
+  normalise,
+  readPaging,
+} from '../_lib/search.js';
+import {
   ALLOWED_MIME_TYPES,
   deleteDriveFile,
   downloadUrl,
@@ -25,13 +32,27 @@ const MAX_TITLE_LENGTH = 200;
 const MAX_EXTRACT_LENGTH = 5000;
 
 async function listBooks(req, res) {
-  const snapshot = await db()
-    .collection('books')
-    .orderBy('createdAt', 'desc')
-    .get();
+  const { limit, cursor, q } = readPaging(req);
+  const collection = db().collection('books');
+
+  // Searching orders by title so the range scan works; browsing orders by
+  // date so the newest additions lead.
+  const base = q
+    ? applyPrefix(collection, 'titleLower', q)
+    : collection.orderBy('createdAt', 'desc');
+
+  const query = await applyCursor(base, collection, cursor);
+
+  const page = await fetchPage(query, limit, (doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
 
   ok(res, {
-    books: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    books: page.items,
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+    query: q || null,
   });
 }
 
@@ -77,6 +98,8 @@ async function createBook(req, res, adminUser) {
 
   const book = {
     title: cleanTitle,
+    // Search key. Kept in step with title on every write; see [id].js.
+    titleLower: normalise(cleanTitle),
     extract: cleanExtract,
     fileId: cleanFileId,
     fileName: driveFile.name || String(fileName || '').trim(),

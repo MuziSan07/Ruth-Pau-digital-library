@@ -5,6 +5,7 @@ import { formatDate } from '../lib/format.js';
 // Ambiguous characters (O/0, l/1) are left out so a password read off a screen
 // and typed on a phone does not fail for the wrong reason.
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PAGE_SIZE = 25;
 
 function generatePassword(length = 10) {
   const values = crypto.getRandomValues(new Uint32Array(length));
@@ -23,12 +24,19 @@ export default function StudentsPage() {
   const [password, setPassword] = useState(() => generatePassword());
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
+  const [cursor, setCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (query = '') => {
     setLoading(true);
     try {
-      const { students: list } = await api.listStudents();
-      setStudents(list);
+      const result = await api.listStudents({ q: query, limit: PAGE_SIZE });
+      setStudents(result.students);
+      setCursor(result.nextCursor);
+      setHasMore(result.hasMore);
+      setActiveQuery(query);
       setError('');
     } catch (err) {
       setError(err.message);
@@ -41,6 +49,29 @@ export default function StudentsPage() {
     load();
   }, [load]);
 
+  // Debounced so a query fires once typing stops, not on every keystroke.
+  useEffect(() => {
+    const term = search.trim();
+    if (term === activeQuery) return undefined;
+    const timer = setTimeout(() => load(term), 350);
+    return () => clearTimeout(timer);
+  }, [search, activeQuery, load]);
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const result = await api.listStudents({ cursor, limit: PAGE_SIZE });
+      setStudents((current) => [...current, ...result.students]);
+      setCursor(result.nextCursor);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function handleCreate(event) {
     event.preventDefault();
     setError('');
@@ -50,7 +81,9 @@ export default function StudentsPage() {
 
     try {
       const result = await api.createStudent({ name, loginId, password });
-      setStudents((current) => [result.student, ...current]);
+      // Only prepend when showing the full list; during a search the new
+      // account may not match the query, and showing it would mislead.
+      if (!activeQuery) setStudents((current) => [result.student, ...current]);
       setIssued(result.credentials);
       setName('');
       setLoginId('');
@@ -123,14 +156,10 @@ export default function StudentsPage() {
     }
   }
 
-  const term = search.trim().toLowerCase();
-  const visible = term
-    ? students.filter(
-        (s) =>
-          s.name?.toLowerCase().includes(term) ||
-          s.loginId?.toLowerCase().includes(term),
-      )
-    : students;
+  // Filtering now happens in the database rather than over a fully downloaded
+  // list, so what the server returned is exactly what to render.
+  const visible = students;
+  const term = activeQuery;
 
   return (
     <>
@@ -139,7 +168,12 @@ export default function StudentsPage() {
           <h1>Students</h1>
           <p>Create accounts and hand out the credentials. Students cannot sign themselves up.</p>
         </div>
-        <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => load(activeQuery)}
+          disabled={loading}
+        >
           Refresh
         </button>
       </div>
@@ -257,19 +291,25 @@ export default function StudentsPage() {
       <div className="card">
         <div className="card-title">
           <h2>All students</h2>
-          <p>{students.length} {students.length === 1 ? 'account' : 'accounts'}</p>
+          <p>
+            {term
+              ? `${students.length} ${students.length === 1 ? 'match' : 'matches'} for “${term}”`
+              : `Showing ${students.length}${hasMore ? ' so far' : ''}`}
+          </p>
         </div>
 
-        {students.length > 0 && (
-          <div className="field">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or login ID…"
-            />
-          </div>
-        )}
+        <div className="field">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or login ID…"
+            aria-label="Search students by name or login ID"
+          />
+          <span className="hint">
+            Matches names and roll numbers that begin with what you type.
+          </span>
+        </div>
 
         {loading ? (
           <div className="empty">Loading…</div>
@@ -335,6 +375,19 @@ export default function StudentsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {hasMore && !term && (
+          <div className="btn-row" style={{ marginTop: 16 }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={loadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading…' : `Load ${PAGE_SIZE} more`}
+            </button>
           </div>
         )}
       </div>
