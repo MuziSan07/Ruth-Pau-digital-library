@@ -37,7 +37,7 @@ You will end this section with **four** things:
 
 ### Step 1.2 — Enable Email/Password authentication
 
-> ℹ️ The Firebase console was redesigned — there is **no "Build" section** any more.
+> The Firebase console was redesigned — there is **no "Build" section** any more.
 > Products now live under **Product categories** in the sidebar:
 > - **Authentication** → under **Security**
 > - **Firestore** → under **Databases & Storage**
@@ -64,7 +64,7 @@ You should now see `Email/Password — Enabled` in the providers list.
    - Europe → `eur3` or `europe-west1`
    - US → `nam5` or `us-central1`
 
-   > ⚠️ The location is **permanent**. It cannot be changed later without recreating the project.
+ > The location is **permanent**. It cannot be changed later without recreating the project.
 
 4. Start in **Production mode** (locked down).
    Do **not** pick Test mode — it auto-opens your database to the public internet for 30 days.
@@ -77,7 +77,7 @@ You should now see `Email/Password — Enabled` in the providers list.
 
 This is for the React admin panel.
 
-1. In the left sidebar click **⚙ Settings → Project settings**
+1. In the left sidebar click **Settings → Project settings**
    (in the redesigned console *Settings* sits directly under *Project Overview*).
 2. Stay on the **General** tab, scroll to **Your apps**.
 3. Click the **web icon `</>`**.
@@ -121,7 +121,7 @@ This lets the server create student accounts. **It bypasses all security rules.*
 
    Create the `admin\.secrets\` folders if they do not exist yet. This path is gitignored — it will never be committed.
 
-> 🔐 **Treat this file like a password to the entire project.**
+> **Treat this file like a password to the entire project.**
 > Anyone holding it can read and delete every student record and book.
 > - Do **not** commit it to git.
 > - Do **not** paste its contents into chat, email, or Slack.
@@ -137,7 +137,7 @@ This lets the server create student accounts. **It bypasses all security rules.*
 
 This is for the Flutter mobile app.
 
-1. **Project settings** → **General** → **Your apps** → click **Add app** → **Android icon 🤖**.
+1. **Project settings** → **General** → **Your apps** → click **Add app** → **Android icon**.
 2. **Android package name** — must match exactly:
 
    ```
@@ -233,7 +233,7 @@ You will end with four values for `admin/.env.local`:
 
 ### Step 2.2b — Publish the consent screen
 
-> ⚠️ **Do not skip this.** While the app sits in *Testing*, Google expires
+> **Do not skip this.** While the app sits in *Testing*, Google expires
 > refresh tokens after **7 days**. Uploads then break with `invalid_grant`
 > a week after setup looked perfectly fine — a genuinely confusing failure to
 > debug. Publishing makes refresh tokens permanent.
@@ -248,7 +248,7 @@ Platform**. Go straight to:
 1. Find **Publishing status** — it reads `Testing`
 2. Click **PUBLISH APP**
 3. Confirm the *"available to any user with a Google Account"* dialog
-4. Status now reads **In production** ✅
+4. Status now reads **In production**
 
 *Older console layout:* **APIs & Services → OAuth consent screen → Publish app**.
 
@@ -293,7 +293,7 @@ only you will ever authorise.
 ### Step 2.4 — Get the refresh token
 
 1. Open **https://developers.google.com/oauthplayground**
-2. Click the **⚙ gear** (top right) → tick **Use your own OAuth credentials**
+2. Click the **gear** (top right) → tick **Use your own OAuth credentials**
    → paste your Client ID and Client secret.
 
    While the panel is open, also confirm:
@@ -320,7 +320,7 @@ only you will ever authorise.
    GOOGLE_REFRESH_TOKEN=1//0g....
    ```
 
-> 🔐 The refresh token grants ongoing access to files this app creates in your
+> The refresh token grants ongoing access to files this app creates in your
 > Drive. Treat it like a password — it is gitignored, never paste it publicly.
 
 ---

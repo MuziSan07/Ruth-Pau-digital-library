@@ -17,7 +17,7 @@ const FOLDER_NAME = 'Digital Library — Ruth Puaf';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
 function bail(message) {
-  console.error(`\n  ✖ ${message}\n`);
+  console.error(`\n  Error: ${message}\n`);
   process.exit(1);
 }
 
@@ -54,7 +54,7 @@ const run = async () => {
   if (existing.data.files?.length) {
     const folder = existing.data.files[0];
     console.log(`
-  ✔ Folder already exists
+  Folder already exists
 
     GOOGLE_DRIVE_FOLDER_ID=${folder.id}
 
@@ -69,7 +69,7 @@ const run = async () => {
   });
 
   console.log(`
-  ✔ Folder created
+  Folder created
 
     Add this line to admin/.env.local and to your Vercel environment variables:
 

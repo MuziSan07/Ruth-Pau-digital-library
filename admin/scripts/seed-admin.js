@@ -17,7 +17,7 @@ import { looksLikeEmail } from '../api/_lib/ids.js';
 const [, , emailArg, passwordArg, ...nameParts] = process.argv;
 
 function bail(message) {
-  console.error(`\n  ✖ ${message}\n`);
+  console.error(`\n  Error: ${message}\n`);
   process.exit(1);
 }
 
@@ -80,7 +80,7 @@ const run = async () => {
   );
 
   console.log(`
-  ✔ Administrator ready
+  Administrator ready
 
     Email : ${email}
     Name  : ${displayName}
